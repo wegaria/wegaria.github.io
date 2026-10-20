@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Appearance · Wegaria</title><meta name="description" content="Branding, colours and CSS, the start page layout, favourites, footer and icons.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html">Getting started</a></li><li><a href="appearance.html" aria-current="page">Appearance</a></li><li><a href="applications.html">Applications</a></li><li><a href="status.html">Status and notices</a></li><li><a href="news.html">News</a></li><li><a href="service.html">Service area</a></li><li><a href="authentication.html">Authentication and access</a></li><li><a href="feedback.html">Feedback widget</a></li><li><a href="deployment.html">Deployment</a></li><li><a href="architecture.html">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="appearance">Appearance</h1>
+<p>The whole look is driven by CSS variables (colours, spacing, radius, font; see <code>:root</code> in <code>src/views/styles.ts</code>). Colour means state (green, yellow, red, purple); the brand gets a single, calm accent.</p>
+<p>The interface is currently German only. Labels in this guide are given as they appear in the UI, with an English gloss on first use.</p>
+<h2 id="branding">Branding</h2>
+<pre><code class="language-yaml">title: Intranet                # page title
+subtitle: Internal services    # optional: line under the greeting on the start page; omit for no line
+branding:
+  logo: logo.svg          # file in config/assets/ or a URL
+  accent: &quot;#2457c5&quot;       # links, current page, primary buttons
+  accentDark: &quot;#7f9fe6&quot;   # optional; otherwise accent is lightened in dark mode only as far as readability (AA) needs
+  radius: default         # sharp | default | round
+  font: &quot;Inter, system-ui, sans-serif&quot;
+  customCss: true         # loads config/assets/custom.css last; it may override any variable
+  surveyTheme: mytheme.json   # optional SurveyJS theme, see &quot;Appearance of forms&quot; in the service area page
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logo</code></td>
+<td>none</td>
+<td>URL, or a file name inside <code>config/assets/</code>.</td>
+</tr>
+<tr>
+<td><code>accent</code></td>
+<td><code>#2457c5</code></td>
+<td>Brand colour as hex (<code>#rgb</code> or <code>#rrggbb</code>).</td>
+</tr>
+<tr>
+<td><code>accentDark</code></td>
+<td>derived</td>
+<td>Brand colour for dark mode.</td>
+</tr>
+<tr>
+<td><code>radius</code></td>
+<td><code>default</code></td>
+<td>Corner rounding: <code>sharp</code>, <code>default</code>, <code>round</code>.</td>
+</tr>
+<tr>
+<td><code>font</code></td>
+<td>none</td>
+<td>A CSS font-family list (letters, digits, spaces, commas, quotes, dots, dashes only; max. 200 characters).</td>
+</tr>
+<tr>
+<td><code>surveyTheme</code></td>
+<td>none</td>
+<td>File name of a <code>.json</code> theme inside <code>config/assets/</code>. See <a href="service.html#appearance-of-forms">Service area</a>.</td>
+</tr>
+<tr>
+<td><code>customCss</code></td>
+<td><code>false</code></td>
+<td>Load <code>assets/custom.css</code> (next to <code>wegaria.yaml</code>) after the built-in styles.</td>
+</tr>
+</tbody>
+</table>
+<p><code>custom.css</code> can, for example, set <code>:root{ --bg:#fff; --container:1280px }</code>, or change the greys in dark mode with <code>@media (prefers-color-scheme:dark)</code>.</p>
+<p>The dark mode is a soft, neutral anthracite (<code>--bg:#2d2f33</code>). Alternatives are shown in <code>docs/ui/dark-palettes.html</code> in the repository.</p>
+<h2 id="start-page">Start page</h2>
+<p>The start page puts work first. At the top is the greeting (&quot;Guten Morgen&quot; until 10:59, &quot;Guten Tag&quot; until 17:59, &quot;Guten Abend&quot; until 21:59, then &quot;Gute Nacht&quot;, in the zone <code>timezone</code>, kept current by the clock), date and clock. Below it is <strong>&quot;Meine Anwendungen&quot;</strong> (my applications: personal favourites, marked with a star on each tile; every application appears only once, the rest is listed under &quot;Weitere Anwendungen&quot;, more applications) and a side column that you compose yourself (<code>side</code>: the areas with the overall status in words, news, key figures).</p>
+<p>The built-in greetings are German. To change the language of the greeting for a time window, use <code>greetings</code> (below).</p>
+<pre><code class="language-yaml">home:
+  clock: true                 # date and clock (the clock keeps running via a small script)
+  greetings:                  # special greeting for a time window; replaces the standard greeting (the first match wins)
+    - { from: &quot;12:30&quot;, to: &quot;13:00&quot;, text: Guten Hunger }                       # &quot;Enjoy your meal&quot; at lunch time
+    - { from: &quot;15:00&quot;, to: &quot;18:00&quot;, days: [fri], text: Schönes Wochenende }    # days is optional; a window may run over midnight
+  noticeBanner: major         # from this severity on, an incident interrupts the start page - but only if it affects MY applications
+  defaults:                   # suggestions until someone sets their own favourites (tile ids); the first star takes them over
+    - { groups: [staff], tiles: [wiki, mail] }
+  side: [search, notices, news]   # blocks of the right column, top to bottom (default); more: widgets (key figures)
+  navigation: quick               # quick: &quot;Schnellauswahl&quot; (quick menu) above the side column | menu: in the menu behind the user circle
+  header: hero                # hero (default) | bar - see below
+  background: { image: hero.jpg, imageDark: hero-dark.jpg, dim: 0.5, position: center }   # optional, images in config/assets/
+  userLinks: true             # let signed-in users add their own links (default true)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clock</code></td>
+<td><code>true</code></td>
+<td>Show date and a live clock at the top.</td>
+</tr>
+<tr>
+<td><code>header</code></td>
+<td><code>hero</code></td>
+<td><code>hero</code>: no solid top bar on the start page, navigation and user sit over the greeting. <code>bar</code>: the same bar as on every other page.</td>
+</tr>
+<tr>
+<td><code>background.image</code></td>
+<td>none</td>
+<td>Image file in <code>config/assets/</code> (landscape, at least 1600 px wide). Allowed: jpg, jpeg, png, webp, avif, as plain file names.</td>
+</tr>
+<tr>
+<td><code>background.imageDark</code></td>
+<td>none</td>
+<td>Optional darker variant for dark mode.</td>
+</tr>
+<tr>
+<td><code>background.dim</code></td>
+<td><code>0.55</code></td>
+<td>How much the image is darkened (0 to 0.9).</td>
+</tr>
+<tr>
+<td><code>background.position</code></td>
+<td><code>center</code></td>
+<td>A CSS background-position such as <code>center</code>, <code>top</code> or <code>50% 30%</code>.</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td><code>[search, notices, news]</code></td>
+<td>Blocks of the side column: <code>search</code>, <code>notices</code>, <code>news</code>, <code>widgets</code>.</td>
+</tr>
+<tr>
+<td><code>greetings</code></td>
+<td><code>[]</code></td>
+<td>Special greetings. <code>from</code> and <code>to</code> are 24-hour times (<code>HH:MM</code>, <code>to</code> exclusive, must differ); <code>text</code> is up to 40 characters; <code>days</code> is an optional list of <code>mon</code> to <code>sun</code> (evaluated in <code>timezone</code>).</td>
+</tr>
+<tr>
+<td><code>userLinks</code></td>
+<td><code>true</code></td>
+<td>Let signed-in users add their own links.</td>
+</tr>
+<tr>
+<td><code>navigation</code></td>
+<td><code>quick</code></td>
+<td>Where Status, Service and News are linked on the start page: <code>quick</code> or <code>menu</code>.</td>
+</tr>
+<tr>
+<td><code>noticeBanner</code></td>
+<td><code>major</code></td>
+<td>One of <code>info</code>, <code>minor</code>, <code>major</code>, <code>critical</code>.</td>
+</tr>
+<tr>
+<td><code>defaults</code></td>
+<td><code>[]</code></td>
+<td>Favourites by group (<code>groups</code> empty = everyone; <code>tiles</code> = tile ids). Unknown tile ids are rejected by the configuration check.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="header-of-the-inner-pages">Header of the inner pages</h3>
+<p>With <code>header: hero</code>, all pages except the administration share the header of the start page:</p>
+<ul>
+<li>the image of <code>home.background</code> (darkened), or the brand colour if there is no image;</li>
+<li>on the left the breadcrumb and the title of the page (description, tags, search);</li>
+<li>in the middle the optional <code>branding.logo</code> (in the same place on every page);</li>
+<li>on the right the &quot;Schnellauswahl&quot; (quick menu: Start, Status, Service, News) and the user circle.</li>
+</ul>
+<p>Breadcrumbs lead back (&quot;Start / Service / ...&quot;). The search sits with the content: on the service start page and the search page above the results, and on the news page as a filter above the entries.</p>
+<p>The <strong>status page</strong> stands on its own: it has the full look of the start page (image behind everything, frosted glass) and also works without signing in. Signed-in users always see the quick menu at the top; visitors who are not signed in find the login in the user menu. When the status page is opened on its own, nothing of Wegaria surrounds it; when the visitor comes from a page of Wegaria (referrer), &quot;← Zurück&quot; (back) and the quick menu appear.</p>
+<p>The administration also has this header (breadcrumb &quot;Start / Administration&quot;, title, logo, quick menu, user). Below it stays the strip &quot;Administration · nur für Administratoren sichtbar&quot; (visible to administrators only), and the title is repeated in the content area.</p>
+<p>With <code>header: bar</code>, the classic white bar stays on all pages and the start page looks like the others.</p>
+<h3 id="hero-instead-of-a-top-bar-header-hero">Hero instead of a top bar (<code>header: hero</code>)</h3>
+<p>On the start page there is no fixed bar. At the top are the greeting, the clock and the user circle. The menu behind the circle contains only personal items (&quot;Meine Anfragen&quot;, my requests; &quot;Administration&quot;; &quot;Abmelden&quot;, sign out) and the search. On all other pages the bar stays; on phones it is the menu.</p>
+<h3 id="background-image">Background image</h3>
+<p>The image sits behind the hero (not behind the whole content, so text always sits on a solid surface). A gradient darkens the image by <code>dim</code> so the white text stays readable (recommended 0.45 to 0.6; bright images rather higher). Without an image there is a subtle gradient in the accent colour.</p>
+<h3 id="notices-in-levels">Notices in levels</h3>
+<p>Only an incident of severity <code>noticeBanner</code> or higher that affects an application visible to the user (or a critical one without an assignment) appears as a narrow strip. Everything else (hints, impairments, maintenance) sits quietly in the side column; maintenance never interrupts. The overall situation is shown in words under &quot;Status&quot; in the quick menu (there is no coloured dot in the navigation).</p>
+<h3 id="side-column-homeside">Side column (<code>home.side</code>)</h3>
+<ul>
+<li><code>search</code>: the search with live hits (see <a href="applications.html#search">Applications</a>). It takes over the search from the user menu.</li>
+<li><code>notices</code>: hints and maintenance.</li>
+<li><code>news</code>: the newest entries; see <a href="news.html">News</a>.</li>
+<li><code>widgets</code>: the key figures from <code>widgets:</code>; see <a href="status.html#widgets">Status</a>.</li>
+</ul>
+<p>What is not in the list does not appear and is not queried. Key figures must therefore be listed deliberately.</p>
+<p>Status, Service and News are reached from the start page through the <strong>&quot;Schnellauswahl&quot;</strong> (quick menu). Its heading &quot;Schnellauswahl ▾&quot; sits level with &quot;Meine Anwendungen&quot;, and the search field below it lines up with the first row of tiles. Under &quot;Status&quot; the overall situation is given in words. With <code>navigation: menu</code> these entries are in the menu behind the user circle instead. On all other pages the navigation reads Start, Status, Service, News.</p>
+<h3 id="customise-mode-anpassen">Customise mode (&quot;Anpassen&quot;)</h3>
+<p>The link <strong>&quot;Anpassen&quot;</strong> (customise) next to the first heading (<code>/?anpassen=1</code>; &quot;Fertig&quot;, done, leads back) shows an eye next to the star on every tile. <strong>Hide</strong> removes the application from the user's own start page (also from the favourites). It can still be found through the search, and in customise mode it is listed under &quot;Ausgeblendet&quot; (hidden) so it can be brought back. This is stored per user in the database (only tile ids, at most 200) and works without JavaScript.</p>
+<p><code>searchOnly: true</code> on a tile (Docker label: <code>wegaria.searchOnly</code>) is the variant for administrators: never on the start page, not even hideable, but found by the search. Use it for rarely needed applications.</p>
+<h3 id="favourites">Favourites</h3>
+<p>Favourites are stored per user in the database (only the tile id, at most 24) and work without JavaScript. Wegaria deliberately does not record what anyone opens.</p>
+<p>Until a user sets favourites, <code>home.defaults</code> applies by group. The first star the user sets takes over the defaults as the user's own favourites.</p>
+<h3 id="own-applications-eigene-anwendungen">Own applications (&quot;Eigene Anwendungen&quot;)</h3>
+<p>Signed-in users can add their own links in customise mode (title, address and, if <code>icons.dir</code> is configured, optionally an icon name such as <code>grafana</code>). They appear in a narrow area &quot;Eigene Anwendungen&quot; (own applications) below &quot;Meine Anwendungen&quot; (icon and title only, no status). They are private: only the owner sees and finds them. At most 50 per user.</p>
+<p>Only http(s) addresses without credentials are allowed. Foreign image URLs as icons are deliberately not supported. Switch the feature off with <code>home.userLinks: false</code>. There is no editing: remove the link and create it again.</p>
+<h2 id="footer">Footer</h2>
+<p>An optional footer under every page, for example for contact persons, availability or imprint and privacy notice:</p>
+<pre><code class="language-yaml">footer:
+  text: |
+    Questions about Wegaria: **Anna Example**, phone 1234, [anna@example.com](mailto:anna@example.com)
+    · [Imprint](https://example.com/imprint)
+  access: { groups: [staff] }   # optional; without it everyone sees the footer, including anonymous visitors
+</code></pre>
+<p><code>text</code> is Markdown (1 to 2000 characters; raw HTML is escaped and <code>javascript:</code> links are not possible). With <code>access</code> the footer can be limited to groups (for example internal phone numbers); <code>public: true</code> additionally shows it to anonymous visitors. Changes are reloaded with the configuration. The footer sits inside the hero wrapper and is pinned to the bottom on short pages.</p>
+<h2 id="icons">Icons</h2>
+<p>Tiles (and categories in the service area) get an icon with <code>icon:</code>:</p>
+<pre><code class="language-yaml">- { title: Mail,    url: ..., icon: &quot;lucide:mail&quot; }          # built-in line icon, follows the design colours
+- { title: Wiki,    url: ..., icon: &quot;wiki.svg&quot; }              # file from config/assets/icons/
+- { title: Grafana, url: ..., icon: &quot;di:grafana&quot; }            # logo from dashboard-icons (see below)
+- { title: External, url: ..., icon: &quot;https://cdn.example.com/x.png&quot; }
+- { title: Time,    url: ..., icon: &quot;TI&quot; }                    # up to two letters; without a value the initials of the title are used
+</code></pre>
+<p>About 120 icons are bundled (Lucide, ISC licence, see <code>third_party/lucide/</code> in the repository). They are listed for browsing in <code>docs/ui/icons.html</code>; the configuration check reports unknown names. Put your own logos (SVG/PNG) into <code>config/assets/icons/</code>. Brand logos of third-party products are deliberately not bundled.</p>
+<h3 id="logos-from-dashboard-icons">Logos from dashboard-icons</h3>
+<p><a href="https://github.com/homarr-labs/dashboard-icons" rel="noopener">dashboard-icons</a> offers about 3500 application logos (the same source as gethomepage). Use <code>icon: di:&lt;name&gt;</code>, for example <code>di:grafana</code>. Wegaria serves the files itself, so browsers never contact a third party (important for networks without internet and for the CSP). For this, a directory with the icons must be available:</p>
+<pre><code class="language-yaml">icons: { dir: ../third_party/dashboard-icons }   # relative to wegaria.yaml; contains svg/, webp/, png/
+</code></pre>
+<ul>
+<li><strong>In the repository</strong> the icons are a git submodule: <code>git submodule update --init --depth 1 third_party/dashboard-icons</code>. The SVGs alone are enough (63 MB instead of all formats): <code>git -C third_party/dashboard-icons sparse-checkout set svg</code>.</li>
+<li><strong>In the container</strong> none of this is in the image (brand logos). Mount the directory, for example <code>./dashboard-icons:/icons:ro</code>, and set <code>icons: { dir: /icons }</code>.</li>
+<li>Names are the file names without extension (<code>di:home-assistant</code>, variants such as <code>di:github-light</code>). SVG is preferred, then WebP, then PNG. Typos and a missing directory are reported to <code>adminGroups</code> as hints.</li>
+<li><strong>Docker labels:</strong> with <code>icons.dir</code>, <code>homepage.icon: grafana</code> or <code>grafana.png</code> means the logo <code>di:grafana</code>. <code>wegaria.icon</code> is taken literally (<code>di:grafana</code>, <code>lucide:...</code>, file name). See <a href="applications.html#applications-from-docker-labels">Applications</a>.</li>
+<li>A <code>di:</code> icon without <code>icons.dir</code> is rejected by the configuration check.</li>
+<li>The brands belong to their owners; the repository only refers to dashboard-icons and does not ship the logos.</li>
+</ul>
+</article><nav class="pager" aria-label="Pages"><a rel="prev" href="getting-started.html">← Getting started</a><a rel="next" href="applications.html">Applications →</a></nav></main><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#branding">Branding</a></li><li><a href="#start-page">Start page</a></li><li><a href="#footer">Footer</a></li><li><a href="#icons">Icons</a></li></ul></nav></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

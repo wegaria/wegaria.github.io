@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feedback widget · Wegaria</title><meta name="description" content="Embed the widget of a separate feedback service on every page, served through your reverse proxy.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html">Getting started</a></li><li><a href="appearance.html">Appearance</a></li><li><a href="applications.html">Applications</a></li><li><a href="status.html">Status and notices</a></li><li><a href="news.html">News</a></li><li><a href="service.html">Service area</a></li><li><a href="authentication.html">Authentication and access</a></li><li><a href="feedback.html" aria-current="page">Feedback widget</a></li><li><a href="deployment.html">Deployment</a></li><li><a href="architecture.html">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="feedback-widget">Feedback widget</h1>
+<p><code>feedback</code> embeds the widget of a separate feedback service on every page: a &quot;Feedback&quot; button with which visitors can leave comments, mark an element of the page and attach a screenshot. Wegaria only embeds the widget; the feedback service itself is a separate product and is not part of Wegaria.</p>
+<pre><code class="language-yaml">feedback:
+  key: pk_abc123           # public key of the project in the feedback service
+  path: /_feedback         # optional, default /_feedback; one path segment
+  identify: true           # send name, e-mail and id of the signed-in person (optional, default false)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>key</code></td>
+<td>required</td>
+<td>The project's public key (<code>pk_</code> followed by letters and digits).</td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td><code>/_feedback</code></td>
+<td>One path segment under which the reverse proxy serves the widget on Wegaria's own origin. It must not collide with a built-in page (<code>/assets</code>, <code>/admin</code>, <code>/auth</code>, <code>/api</code>, <code>/status</code>, <code>/service</code>, <code>/news</code>, <code>/search</code>, <code>/my</code>, <code>/forms</code>, <code>/healthz</code>, <code>/favorites</code>).</td>
+</tr>
+<tr>
+<td><code>identify</code></td>
+<td><code>false</code></td>
+<td>Send the signed-in user's id, name and e-mail with their feedback.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-it-works">How it works</h2>
+<ul>
+<li>Wegaria inserts only a script tag: <code>/_feedback/widget.js</code> (the path can be changed with <code>path</code>). <strong>It does not serve the widget itself and does not forward anything.</strong></li>
+<li>A reverse proxy, for example Traefik, sends the path <strong>on Wegaria's origin</strong> to the feedback service. Because of this, the Content-Security-Policy stays unchanged (<code>script-src 'self'</code>, <code>connect-src 'self'</code>) and CORS is not involved.</li>
+<li><strong>Forward only <code>/_feedback/v1</code> and <code>/_feedback/widget.js</code>, nothing more.</strong> Otherwise the administration and API of the feedback service would be reachable under Wegaria's address. A ready-made Traefik rule is in <a href="deployment.html#feedback-widget-on-the-same-host-optional">Deployment</a>; the documentation of the feedback service describes serving it under the path of your own application.</li>
+<li>Without a proxy rule the path answers 404. The widget then simply does not appear and the site works as normal.</li>
+<li><code>identify</code> sends the data as a <em>claimed</em> identity; the feedback service marks it as &quot;stated&quot;, not verified. It appears only in the HTML of the signed-in person themselves.</li>
+<li>In the feedback service, enter the public URL of Wegaria under its allowed origins.</li>
+</ul>
+<h2 id="trying-it-with-the-demo">Trying it with the demo</h2>
+<p><code>FEEDBACK_KEY=pk_... npm run demo</code> adds the block to the demo configuration. Start Traefik locally with <code>demo/traefik.yml</code> (the command is written in that file) and open <code>http://localhost:3200</code>. The file <code>demo/wegaria.generated.yaml</code> is a generated artefact and is not committed.</p>
+</article><nav class="pager" aria-label="Pages"><a rel="prev" href="authentication.html">← Authentication and access</a><a rel="next" href="deployment.html">Deployment →</a></nav></main><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#how-it-works">How it works</a></li><li><a href="#trying-it-with-the-demo">Trying it with the demo</a></li></ul></nav></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

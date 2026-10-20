@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Service area · Wegaria</title><meta name="description" content="Categories, FAQ pages, SurveyJS forms with actions, My requests, administration and CSV export.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html">Getting started</a></li><li><a href="appearance.html">Appearance</a></li><li><a href="applications.html">Applications</a></li><li><a href="status.html">Status and notices</a></li><li><a href="news.html">News</a></li><li><a href="service.html" aria-current="page">Service area</a></li><li><a href="authentication.html">Authentication and access</a></li><li><a href="feedback.html">Feedback widget</a></li><li><a href="deployment.html">Deployment</a></li><li><a href="architecture.html">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="service-area">Service area</h1>
+<p><code>service: { dir: content }</code> enables categories, FAQ pages, search and forms. Content consists of files, which keeps it git-friendly.</p>
+<pre><code class="language-yaml">service:
+  title: Service       # name of the area in the navigation (default &quot;Service&quot;)
+  dir: content         # content directory relative to the config file (default &quot;content&quot;)
+</code></pre>
+<h2 id="content-layout">Content layout</h2>
+<pre><code>content/
+  workplace/
+    category.yaml            # title, description, order, icon, access
+    overview.md              # optional introductory text
+    _assets/banner.jpg       # banner.* is shown at the top; images in text: ![x](_assets/image.png)
+    printers/
+      category.yaml
+      install-printer.faq.md           # front matter: title, summary, tags, access, related: [form-id], featured
+      printer-problem.form.yaml        # form (see below)
+</code></pre>
+<ul>
+<li>IDs are paths (<code>workplace/printers/printer-problem</code>) and stay stable even if the content changes.</li>
+<li><code>access</code> is inherited downwards. Content that is not visible answers with 404 and appears neither in lists nor in the search.</li>
+<li>Markdown does not allow raw HTML; <code>javascript:</code> links are discarded.</li>
+<li>Broken files do not take the site down: the last good version stays active, and administrators see the errors at the top of the page.</li>
+<li>In the YAML short notation <code>{ ... }</code>, texts containing a comma must be quoted (<code>title: &quot;Accounts, devices&quot;</code>), otherwise YAML cuts them off. Wegaria recognises the rest as a key without a value and reports it to the administrators as a hint (the file stays active).</li>
+</ul>
+<h2 id="faq-pages">FAQ pages</h2>
+<p>FAQ pages are Markdown files named <code>*.faq.md</code>. Front matter fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>title</code>, <code>summary</code>, <code>tags</code></td>
+<td>Title, short text and tags (also searched).</td>
+</tr>
+<tr>
+<td><code>access</code></td>
+<td>Who may see the page, in addition to the rules of its category.</td>
+</tr>
+<tr>
+<td><code>related</code></td>
+<td>Ids of related forms, for example <code>workplace/printers/printer-problem</code>. Shown as &quot;Problem nicht gelöst?&quot; (problem not solved?).</td>
+</tr>
+<tr>
+<td><code>apps</code></td>
+<td>Ids of the applications (tiles) this page documents; it is listed on their <a href="applications.html#application-pages-and-documentation">application page</a>.</td>
+</tr>
+<tr>
+<td><code>group</code></td>
+<td>Heading under which the page is listed on an application page (default: the title of its category).</td>
+</tr>
+<tr>
+<td><code>featured</code></td>
+<td><code>true</code> lists the page on the service start page.</td>
+</tr>
+<tr>
+<td><code>order</code></td>
+<td>Sort order (default 100).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="side-columns-and-the-service-start-page">Side columns and the service start page</h2>
+<ul>
+<li>A <strong>FAQ page</strong> shows on the right the application(s) from its <code>apps:</code> (only those the user may see), the request from <code>related:</code> (&quot;Problem nicht gelöst?&quot;) and further entries of the category.</li>
+<li>A <strong>form</strong> shows the application(s) from <code>apps:</code>, pages that refer to it (&quot;Vorher nachlesen&quot;, read this first) and what happens with the data (<code>retentionDays</code>, <code>history</code>).</li>
+<li>The <strong>service start page</strong> puts questions and requests side by side. Which pages appear there is decided with <code>featured: true</code> (in the front matter of a FAQ page or in the header of a form). At most eight are listed, sorted by <code>order</code> and title, each with its area. If nothing is marked <code>featured</code>, the start page shows a simple selection of the first pages.</li>
+</ul>
+<h2 id="forms">Forms</h2>
+<p>A form is a <code>*.form.yaml</code> file:</p>
+<pre><code class="language-yaml">title: Report a printer problem
+access: { groups: [staff] }          # public: true allows anonymous submissions
+retentionDays: 90                    # keep answers this long
+featured: true                       # list on the service start page (optional)
+history: true                        # users can see their own submissions
+rateLimitPerMinute: 5
+prefill: { contact: user.name }      # question -&gt; user.id | user.name | user.email
+apps: [printing]                     # tile ids this form belongs to (optional)
+actions:
+  - type: email
+    to: [it-support@example.com]
+    subject: &quot;Printer problem from {{user.name}}&quot;
+    body: &quot;{{answers}}&quot;              # also {{answer.&lt;question&gt;}}, {{submission.id}}, {{form.title}}
+                                     # dynamic panels: {{#each &lt;panel&gt;}}{{@number}}. {{field}}\n{{/each}} (at most 100 entries)
+    replyToUser: true
+  - { type: webhook, target: helpdesk }   # targets are defined in wegaria.yaml (never put secrets in content)
+  - { type: git, target: archive }
+survey:                               # SurveyJS JSON (paste a Creator export)
+  elements:
+    - { type: text, name: contact, title: Your name, isRequired: true }
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>title</code></td>
+<td>required</td>
+<td>Form title.</td>
+</tr>
+<tr>
+<td><code>access</code></td>
+<td>inherited</td>
+<td><code>public: true</code> allows anonymous submissions.</td>
+</tr>
+<tr>
+<td><code>retentionDays</code></td>
+<td><code>90</code></td>
+<td>How long answers are stored in days. <code>0</code> keeps them only until all actions are delivered. Data protection: see below.</td>
+</tr>
+<tr>
+<td><code>history</code></td>
+<td><code>false</code></td>
+<td>Users see their own submissions on <code>/my</code> (requires <code>retentionDays</code> greater than 0).</td>
+</tr>
+<tr>
+<td><code>featured</code></td>
+<td><code>false</code></td>
+<td>List on the service start page.</td>
+</tr>
+<tr>
+<td><code>rateLimitPerMinute</code></td>
+<td><code>5</code></td>
+<td>Submissions per minute (one bucket per form).</td>
+</tr>
+<tr>
+<td><code>prefill</code></td>
+<td><code>{}</code></td>
+<td>Pre-fill a question with an attribute of the signed-in user: <code>user.id</code>, <code>user.name</code> or <code>user.email</code>.</td>
+</tr>
+<tr>
+<td><code>apps</code></td>
+<td><code>[]</code></td>
+<td>Tile ids this form belongs to; it is listed on their application page.</td>
+</tr>
+<tr>
+<td><code>actions</code></td>
+<td>–</td>
+<td>What to do with a submission (below).</td>
+</tr>
+<tr>
+<td><code>survey</code></td>
+<td>required</td>
+<td>The SurveyJS model as JSON.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="validation">Validation</h3>
+<p>The server checks every submission with the same engine as the browser (required fields, validators, <code>visibleIf</code>). Unknown fields and answers to hidden questions are discarded.</p>
+<p>The rate limit for anonymous forms is coarse (one bucket per form). Add a honeypot or captcha if you need more protection.</p>
+<p><strong>Not supported:</strong> <code>choicesByUrl</code> and file and signature questions. They are rejected when the file is loaded.</p>
+<h3 id="actions">Actions</h3>
+<p>Actions run in the background through a queue in SQLite: up to 6 attempts (after 1 min, 5 min, 30 min, 2 h, 12 h), then the state is <code>failed</code>. Everything is in the audit log (<code>form.submitted</code>, <code>action.ok</code>, <code>action.error</code>, <code>action.failed</code>). Failed actions can be retried in the administration.</p>
+<ul>
+<li><strong><code>email</code></strong>: a plain-text mail through <code>smtp</code>. The subject is made single-line (no header injection). Fields: <code>to</code> (list), <code>subject</code>, <code>body</code>, <code>replyToUser</code> (set Reply-To to the submitter's address; default <code>false</code>).</li>
+<li><strong><code>webhook</code></strong>: a JSON POST with the headers <code>x-wegaria-timestamp</code> and <code>x-wegaria-signature: sha256=HMAC(secret, &quot;&lt;timestamp&gt;.&lt;body&gt;&quot;)</code>, a timeout, no redirects; success means a 2xx response.</li>
+<li><strong><code>git</code></strong>: writes <code>&lt;form&gt;__&lt;reference&gt;.json</code> into the repository and commits (one operation per repository at a time, optional <code>push</code>).</li>
+</ul>
+<p>Targets and credentials live in <code>wegaria.yaml</code>, never in the content:</p>
+<pre><code class="language-yaml">smtp:
+  host: smtp.example.com
+  port: 587              # default 587
+  secure: false          # true = implicit TLS (port 465); otherwise STARTTLS is used automatically
+  user: wegaria
+  password: ${file:/run/secrets/smtp}
+  servername: smtp.example.com   # optional: TLS server name (SNI) if it differs from host
+  from: &quot;Wegaria &lt;wegaria@example.com&gt;&quot;
+targets:
+  helpdesk:
+    type: webhook
+    url: https://helpdesk.example.com/hooks/wegaria
+    secret: ${file:/run/secrets/helpdesk_hook}   # HMAC key, at least 16 characters
+    headers: { x-token: abc }                     # optional
+    timeoutMs: 10000                              # default 10000, max. 60000
+  archive:
+    type: git
+    dir: /archive          # absolute working directory of the repository
+    init: false            # git init if the directory is not a repository yet
+    push: false
+    authorName: Wegaria
+    authorEmail: wegaria@example.com
+</code></pre>
+<p>The <code>git</code> action needs <code>git</code> in the runtime (the container image includes it). For the container setup see <a href="deployment.html#operations">Deployment</a>.</p>
+<h3 id="data-protection">Data protection</h3>
+<p>Answers often contain personal data. They are deleted after <code>retentionDays</code> (only once nothing remains to be delivered); records and audit entries are deleted after <code>auditRetentionDays</code> (top-level setting, default 365).</p>
+<h3 id="csrf">CSRF</h3>
+<p>Submissions are JSON POSTs and are accepted only with a matching <code>Origin</code>. Set <code>baseUrl</code>, or pass <code>Host</code>/<code>X-Forwarded-Host</code> through correctly.</p>
+<p>Data is stored in <code>$WEGARIA_DATA/wegaria.sqlite3</code> (default <code>./data</code>).</p>
+<h3 id="appearance-of-forms">Appearance of forms</h3>
+<p>SurveyJS 3 is loaded with its official themes (light/dark, flat). The grey scale and the brand colour are mapped to the Wegaria colours, so fields, switches, ratings and buttons are readable in both modes. For a custom look, export a theme from the SurveyJS theme editor and put it into <code>config/assets/&lt;name&gt;.json</code> (<code>branding.surveyTheme: &lt;name&gt;.json</code>). Its <code>cssVariables</code> apply in addition to the Wegaria defaults.</p>
+<p><code>demo/content/it-support/feldtypen.form.yaml</code> in the repository shows all common question types for testing.</p>
+<h2 id="my-requests-meine-anfragen">My requests (&quot;Meine Anfragen&quot;)</h2>
+<p><code>/my</code> shows signed-in users their own submissions for forms with <code>history: true</code>. Answers are shown only as long as they are stored according to <code>retentionDays</code>.</p>
+<h2 id="administration">Administration</h2>
+<p><code>/admin</code> is available to members of <code>adminGroups</code> only; for everyone else it answers 404. It contains:</p>
+<ul>
+<li>key figures,</li>
+<li>failed actions, with &quot;Erneut versuchen&quot; (retry),</li>
+<li>submissions (filterable with <code>?form=&lt;id&gt;</code>),</li>
+<li>details with answers, and the audit log,</li>
+<li>the <a href="status.html#notice-editor">notice editor</a> at <code>/admin/notices</code> when <code>incidents.editable</code> is on.</li>
+</ul>
+<p>Opening a submission is logged as <code>admin.view</code>.</p>
+<h3 id="csv-export">CSV export</h3>
+<p><code>/admin/export.csv?form=&lt;id&gt;</code> returns all submissions of a form with one column per question (only answers that are still retained). Without <code>form</code>, only the overview without answers is exported.</p>
+<ul>
+<li>Encoding is UTF-8 with BOM. The delimiter is <code>;</code> when <code>lang: de</code> and <code>,</code> otherwise.</li>
+<li>Cells that Excel would execute as a formula (starting with <code>=</code>, <code>+</code>, <code>-</code> or <code>@</code>) are defused with a leading <code>'</code>.</li>
+<li>Every export is in the audit log as <code>admin.export</code>.</li>
+</ul>
+<h3 id="audit-events">Audit events</h3>
+<p><code>form.submitted</code>, <code>action.ok</code>, <code>action.error</code>, <code>action.failed</code>, <code>action.retry</code>, <code>data.purged</code>, <code>admin.view</code>, <code>admin.export</code>, <code>notice.created</code>, <code>notice.updated</code>, <code>notice.deleted</code>, and with native OIDC <code>auth.login</code>, <code>auth.logout</code>, <code>auth.groups_changed</code>, <code>auth.revoked</code>, <code>auth.backchannel_logout</code>.</p>
+</article><nav class="pager" aria-label="Pages"><a rel="prev" href="news.html">← News</a><a rel="next" href="authentication.html">Authentication and access →</a></nav></main><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#content-layout">Content layout</a></li><li><a href="#faq-pages">FAQ pages</a></li><li><a href="#side-columns-and-the-service-start-page">Side columns and the service start page</a></li><li><a href="#forms">Forms</a></li><li><a href="#my-requests-meine-anfragen">My requests (&quot;Meine Anfragen&quot;)</a></li><li><a href="#administration">Administration</a></li></ul></nav></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

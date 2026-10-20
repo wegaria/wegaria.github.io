@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Authentication and access · Wegaria</title><meta name="description" content="Sign-in modes (dev, headers, oidc), access rules, secrets and OIDC details.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html">Getting started</a></li><li><a href="appearance.html">Appearance</a></li><li><a href="applications.html">Applications</a></li><li><a href="status.html">Status and notices</a></li><li><a href="news.html">News</a></li><li><a href="service.html">Service area</a></li><li><a href="authentication.html" aria-current="page">Authentication and access</a></li><li><a href="feedback.html">Feedback widget</a></li><li><a href="deployment.html">Deployment</a></li><li><a href="architecture.html">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="authentication-and-access">Authentication and access</h1>
+<h2 id="modes">Modes</h2>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dev</code></td>
+<td>A fixed user from the configuration; for development only.</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td>Forward auth (Traefik with Authelia or oauth2-proxy). Identity headers are accepted <strong>only</strong> from <code>trustedProxies</code>.</td>
+</tr>
+<tr>
+<td><code>oidc</code></td>
+<td>Native sign-in (authorization code with PKCE), server-side sessions, groups from the ID token or userinfo.</td>
+</tr>
+</tbody>
+</table>
+<p>Wegaria builds a principal (id, name, e-mail, groups) from one of these. Access decisions are always made on the server.</p>
+<h3 id="dev"><code>dev</code></h3>
+<pre><code class="language-yaml">auth:
+  mode: dev
+  user: dev                    # default &quot;dev&quot;
+  name: Dev User               # default &quot;Dev User&quot;
+  email: dev@example.com       # default &quot;dev@example.invalid&quot;
+  groups: [it, staff]
+  logoutUrl: https://example.com/logout   # optional
+</code></pre>
+<p>Never use <code>dev</code> in production: everyone is signed in as that user.</p>
+<h3 id="headers-forward-auth"><code>headers</code> (forward auth)</h3>
+<pre><code class="language-yaml">auth:
+  mode: headers
+  trustedProxies: [10.250.0.0/24]   # IPs/CIDRs of the reverse proxy; required
+  headers:                          # defaults shown
+    user: Remote-User
+    name: Remote-Name
+    email: Remote-Email
+    groups: Remote-Groups
+  groupsSeparator: &quot;,&quot;              # default &quot;,&quot;
+  groupNormalize: none              # none | strip-leading-slash | last-segment
+  logoutUrl: https://auth.example.com/logout   # optional
+</code></pre>
+<p><strong>Security warning.</strong> Headers are trusted only when the request comes from an address in <code>trustedProxies</code>. That check knows only the source address.</p>
+<ul>
+<li>Wegaria must not be reachable directly: anybody who can reach it could set the headers themselves. The Compose example publishes no ports.</li>
+<li>Only the reverse proxy (and Wegaria) belong in the network listed in <code>trustedProxies</code>, ideally a dedicated network per application. Another container in the same network could forge the headers.</li>
+<li>The proxy must overwrite or remove client-supplied identity headers. With Traefik, <code>authResponseHeaders</code> must list all four headers Wegaria reads. See <a href="deployment.html#authelia-middleware">Deployment</a>.</li>
+</ul>
+<p><code>groupNormalize</code> fixes group paths such as <code>/it/admins</code> that Keycloak delivers: <code>strip-leading-slash</code> gives <code>it/admins</code>, <code>last-segment</code> gives <code>admins</code>.</p>
+<h3 id="oidc"><code>oidc</code></h3>
+<p>See <a href="#oidc-details">OIDC details</a> below.</p>
+<h2 id="access-rules">Access rules</h2>
+<p>Visibility is controlled with <code>access: { groups, deny, public }</code> on sections, tiles, widgets, news feeds, notices, the footer, and (inherited from categories) FAQ pages and forms.</p>
+<pre><code class="language-yaml">access:
+  groups: [staff, it]    # any of these groups; empty or absent = any signed-in user
+  deny: [contractors]    # wins over everything
+  public: true           # additionally lets anonymous visitors in
+</code></pre>
+<ul>
+<li>All rules along the path must allow; <code>deny</code> wins. Filtering is done on the server.</li>
+<li>Without a rule, all signed-in users see the entry; anonymous visitors only with <code>public: true</code>.</li>
+<li>Content that may not be seen answers with 404 and does not appear in lists or the search.</li>
+<li>With <code>oidc</code>, anonymous visitors see nothing at all unless <code>auth.public: true</code> is set (otherwise they are redirected to the login). To release only the state of one service, use <code>status.public</code> (see <a href="status.html#public-status-page">Status</a>).</li>
+<li>Groups that may use the administration are listed in the top-level <code>adminGroups</code>.</li>
+</ul>
+<h2 id="secrets">Secrets</h2>
+<p>Never write secrets into the YAML. <code>${env:NAME}</code> and <code>${file:/run/secrets/name}</code> are replaced when the configuration is loaded. They are re-read only when the YAML file changes (see <a href="getting-started.html#reloading-the-configuration">Getting started</a>). Secrets never belong in content files; webhook secrets and SMTP passwords live in <code>wegaria.yaml</code>.</p>
+<h2 id="oidc-details">OIDC details</h2>
+<pre><code class="language-yaml">baseUrl: https://wegaria.example.com     # public URL; the redirect URI is &lt;baseUrl&gt;/auth/callback
+auth:
+  mode: oidc
+  issuer: https://auth.example.com/realms/main
+  clientId: wegaria
+  clientSecret: ${file:/run/secrets/wegaria_oidc}
+  groupsClaim: groups
+  groupNormalize: strip-leading-slash   # Keycloak delivers paths such as /it/admins
+  public: false                         # true: Wegaria is also reachable without signing in (anonymous visitors see only what is `public`);
+                                        # false: redirect to the login
+                                        # (`autoLogin: false` is the old name for `public: true`)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>issuer</code></td>
+<td>required</td>
+<td>Issuer URL; discovery runs against <code>/.well-known/openid-configuration</code>.</td>
+</tr>
+<tr>
+<td><code>clientId</code></td>
+<td>required</td>
+<td>Client id.</td>
+</tr>
+<tr>
+<td><code>clientSecret</code></td>
+<td>none</td>
+<td>Omit for public clients (PKCE is always used).</td>
+</tr>
+<tr>
+<td><code>scopes</code></td>
+<td><code>[openid, profile, email, groups]</code></td>
+<td>Requested scopes.</td>
+</tr>
+<tr>
+<td><code>groupsClaim</code></td>
+<td><code>groups</code></td>
+<td>Claim that carries the groups.</td>
+</tr>
+<tr>
+<td><code>groupNormalize</code></td>
+<td><code>none</code></td>
+<td><code>none</code>, <code>strip-leading-slash</code> or <code>last-segment</code>.</td>
+</tr>
+<tr>
+<td><code>sessionHours</code></td>
+<td><code>8</code></td>
+<td>Session lifetime.</td>
+</tr>
+<tr>
+<td><code>recheckMinutes</code></td>
+<td><code>15</code></td>
+<td>How often group membership is re-read from the IdP with the refresh token (0 = only at login).</td>
+</tr>
+<tr>
+<td><code>public</code></td>
+<td><code>false</code></td>
+<td>See above.</td>
+</tr>
+<tr>
+<td><code>autoLogin</code></td>
+<td><code>true</code></td>
+<td>Deprecated; use <code>public</code> (<code>autoLogin: false</code> equals <code>public: true</code>).</td>
+</tr>
+<tr>
+<td><code>allowInsecureHttp</code></td>
+<td><code>false</code></td>
+<td>Allow an <code>http://</code> issuer (local development only).</td>
+</tr>
+</tbody>
+</table>
+<p><code>baseUrl</code> is required with <code>oidc</code>. The redirect URI to register at the IdP is <code>&lt;baseUrl&gt;/auth/callback</code>. <code>auth</code> and <code>baseUrl</code> are read only at start-up.</p>
+<ul>
+<li><strong>Keycloak:</strong> create a &quot;Group Membership&quot; mapper on the client (claim <code>groups</code>). <strong>Authelia:</strong> groups come through userinfo, which is fetched automatically.</li>
+<li><strong>Sessions</strong> are stored in SQLite (<code>$WEGARIA_DATA/wegaria.sqlite3</code>) and survive restarts and updates. Only a hash of the session id is stored; the ID token (used at sign-out) and the refresh token are stored encrypted (see below). The cookie is <code>HttpOnly</code>, <code>SameSite=Lax</code>, and <code>Secure</code> with an https <code>baseUrl</code>.</li>
+<li><strong>Group changes</strong> apply without a new sign-in: every <code>recheckMinutes</code> (default 15; <code>0</code> = only at login) Wegaria asks the IdP again with the refresh token. Groups are updated (audit: <code>auth.groups_changed</code> with added/removed groups). If the IdP rejects the token (user blocked or deleted, session ended there), the user is signed out (<code>auth.revoked</code>). If the IdP is briefly unreachable, the last known groups apply and Wegaria retries after a minute.
+<ul>
+<li><strong>Keycloak</strong> issues refresh tokens by default. <strong>Authelia</strong> only with the scope <code>offline_access</code>: allow it on the client (<code>scopes</code>, <code>grant_types: [authorization_code, refresh_token]</code>) and add it to <code>auth.scopes</code>. Without a refresh token, Wegaria records a warning at the first login and checks groups only at login.</li>
+<li>The refresh token and ID token are stored encrypted (AES-256-GCM) in the sessions table. Back up the database accordingly. The key is in <code>$WEGARIA_DATA/session.key</code> (created at first start, mode 0600). Keep that file separately from the database; without it, stored sessions are unusable (users sign in again).</li>
+</ul>
+</li>
+<li><strong>Back-channel logout:</strong> the IdP can end sessions immediately by calling <code>https://&lt;baseUrl&gt;/auth/backchannel-logout</code> (OIDC Back-Channel Logout 1.0). The signed token is verified: signature, issuer, audience, age of at most 5 minutes, replay protection. Keycloak: set <em>Backchannel logout URL</em> on the client and enable <em>Backchannel logout session required</em>. The endpoint must be reachable directly for the IdP (not behind forward auth). Audit event: <code>auth.backchannel_logout</code>.</li>
+<li><strong>Logout</strong> is a POST (CSRF-protected through an Origin check against <code>baseUrl</code>) and, where supported, also ends the IdP session.</li>
+</ul>
+</article><nav class="pager" aria-label="Pages"><a rel="prev" href="service.html">← Service area</a><a rel="next" href="feedback.html">Feedback widget →</a></nav></main><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#modes">Modes</a></li><li><a href="#access-rules">Access rules</a></li><li><a href="#secrets">Secrets</a></li><li><a href="#oidc-details">OIDC details</a></li></ul></nav></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

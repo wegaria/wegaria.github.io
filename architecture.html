@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture · Wegaria</title><meta name="description" content="Design guidelines, how Wegaria is built, and the UI system.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html">Getting started</a></li><li><a href="appearance.html">Appearance</a></li><li><a href="applications.html">Applications</a></li><li><a href="status.html">Status and notices</a></li><li><a href="news.html">News</a></li><li><a href="service.html">Service area</a></li><li><a href="authentication.html">Authentication and access</a></li><li><a href="feedback.html">Feedback widget</a></li><li><a href="deployment.html">Deployment</a></li><li><a href="architecture.html" aria-current="page">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="architecture">Architecture</h1>
+<h2 id="guidelines">Guidelines</h2>
+<ul>
+<li><strong>Lightweight:</strong> one process, SQLite, no build pipeline for the front end.</li>
+<li><strong>Config as code:</strong> YAML and Markdown, git-friendly.</li>
+<li><strong>Secure by default:</strong> permission checks on the server; secrets never in the browser or in content.</li>
+<li><strong>Open:</strong> Apache-2.0, no dependency on external services to operate it.</li>
+</ul>
+<h2 id="building-blocks">Building blocks</h2>
+<ul>
+<li><strong>Stack:</strong> TypeScript, Hono, rendered on the server (<code>hono/jsx</code>). The browser gets JavaScript only where it is needed (SurveyJS forms).</li>
+<li><strong>One configuration schema</strong> (Zod) for <code>wegaria.yaml</code>. <code>config/wegaria.schema.json</code> for IDE completion is generated from it.</li>
+<li><strong>Access:</strong> a <code>Principal</code> (id, name, e-mail, groups) from forward-auth headers (only from <code>trustedProxies</code>), native OIDC or the dev mode. <code>access: { groups, deny, public }</code> is inherited from top to bottom and always evaluated on the server; anything not visible answers with 404. See <a href="authentication.html">Authentication</a>.</li>
+<li><strong>Status:</strong> no checker of its own. Providers for Uptime Kuma, Prometheus and Gatus (plus a generic HTTP/JSONPath provider for widgets) run in the backend, with a stale-while-revalidate cache, timeout, size limit and no redirects. Credentials never leave the server. See <a href="status.html">Status</a>.</li>
+<li><strong>Content</strong> (<code>content/</code>): <code>category.yaml</code>, <code>*.faq.md</code>, <code>*.form.yaml</code>, <code>_assets/</code>; ids are paths. A broken file keeps its last good version. See <a href="service.html">Service area</a>.</li>
+<li><strong>Forms:</strong> the SurveyJS runtime (MIT licence; the Creator is commercial and is not used). Input is validated again on the server with <code>survey-core</code>. After that come SQLite (submission, retention period, audit) and a durable queue for the actions <code>email</code>, <code>webhook</code> (signed) and <code>git</code> (backoff, retry, status in the administration). Targets and credentials live in <code>wegaria.yaml</code>, never in content. No script execution.</li>
+<li><strong>Notices:</strong> incidents and maintenance from Markdown files (also editable in the administration) and/or from Uptime Kuma status pages. They colour affected tiles without making a worse measured status look better.</li>
+<li><strong>Sessions</strong> in SQLite (only a hash of the session id), tokens encrypted (<code>session.key</code>). Groups are re-read regularly with the refresh token; back-channel logout ends sessions immediately.</li>
+<li><strong>Operations:</strong> configuration and content are reloaded live; <code>auth</code>, <code>baseUrl</code> and the directories need a restart. See <a href="deployment.html">Deployment</a>.</li>
+</ul>
+<h2 id="user-interface">User interface</h2>
+<p>One design system made of CSS variables: colour means state, one configurable accent, light and dark mode, mobile first, usable without JavaScript. Details and an inventory are in <code>docs/ui/</code> in the repository. Pages share the header, grid and building blocks (<code>ui.tsx</code>, <code>admin-shell.tsx</code>); accessibility is checked automatically. Customisation is described in <a href="appearance.html">Appearance</a>.</p>
+</article><nav class="pager" aria-label="Pages"><a rel="prev" href="deployment.html">← Deployment</a><span></span></nav></main><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#guidelines">Guidelines</a></li><li><a href="#building-blocks">Building blocks</a></li><li><a href="#user-interface">User interface</a></li></ul></nav></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

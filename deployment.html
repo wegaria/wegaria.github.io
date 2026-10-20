@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deployment · Wegaria</title><meta name="description" content="Run Wegaria as a container behind Traefik and Authelia, or with native OIDC, and operate it.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html">Getting started</a></li><li><a href="appearance.html">Appearance</a></li><li><a href="applications.html">Applications</a></li><li><a href="status.html">Status and notices</a></li><li><a href="news.html">News</a></li><li><a href="service.html">Service area</a></li><li><a href="authentication.html">Authentication and access</a></li><li><a href="feedback.html">Feedback widget</a></li><li><a href="deployment.html" aria-current="page">Deployment</a></li><li><a href="architecture.html">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="deployment">Deployment</h1>
+<h2 id="image">Image</h2>
+<pre><code class="language-sh">docker build -t wegaria:local .
+docker run --rm -p 3000:3000 -v &quot;$PWD/config:/config:ro&quot; -v wegaria-data:/data wegaria:local
+</code></pre>
+<ul>
+<li>Base image <code>node:22-bookworm-slim</code> (with <code>git</code> for the <code>git</code> action). It runs as the user <code>node</code>, without root rights.</li>
+<li><code>/config</code> (read-only): <code>wegaria.yaml</code>, <code>content/</code>, optional <code>assets/</code> (logo). Changes are picked up without a restart.</li>
+<li><code>/data</code> (volume): the SQLite database with submissions, queue and audit log. <strong>Back it up.</strong></li>
+<li>Environment: <code>WEGARIA_CONFIG</code> (default <code>/config/wegaria.yaml</code>), <code>WEGARIA_DATA</code> (<code>/data</code>), <code>PORT</code> (<code>3000</code>).</li>
+<li>The <code>HEALTHCHECK</code> queries <code>/healthz</code> (works without sign-in; use it directly on the container, not through Traefik).</li>
+<li>The image works with <code>read_only: true</code>, <code>cap_drop: [ALL]</code> and <code>no-new-privileges</code> (as in the Compose example).</li>
+</ul>
+<h2 id="compose-example-traefik-and-authelia-forward-auth">Compose example: Traefik and Authelia (forward auth)</h2>
+<p>Files in <code>deploy/</code>: <code>compose.yaml</code>, <code>.env.example</code>, <code>config/</code> (starting configuration).</p>
+<ol>
+<li><strong>Create a network with a fixed subnet</strong> in which Traefik and Wegaria sit:<pre><code class="language-sh">docker network create --subnet 10.250.0.0/24 proxy
+</code></pre>
+Traefik must be attached to this network. Enter the subnet in <code>config/wegaria.yaml</code> under <code>auth.trustedProxies</code>. Wegaria trusts the identity headers <strong>only</strong> from these addresses. If another container sits in the same network, it could forge the headers: only Traefik (and Wegaria) belong in this network, ideally a dedicated one per application.</li>
+<li><code>cp .env.example .env</code>, set <code>WEGARIA_HOST</code>, and adjust <code>baseUrl</code> in <code>config/wegaria.yaml</code>.</li>
+<li><code>docker compose up -d --build</code></li>
+</ol>
+<p>Wegaria publishes <strong>no ports</strong>. If it is reachable directly, anyone can set the headers themselves, because the trust check knows only the source address.</p>
+<h3 id="authelia-middleware">Authelia middleware</h3>
+<p>Traefik needs a ForwardAuth middleware called <code>authelia</code>. If it does not exist yet, define it on a container with <code>traefik.enable=true</code> and a service port, for example Authelia itself:</p>
+<pre><code class="language-yaml">traefik.http.middlewares.authelia.forwardauth.address: http://authelia:9091/api/authz/forward-auth
+traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: &quot;true&quot;
+traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: Remote-User,Remote-Groups,Remote-Name,Remote-Email
+</code></pre>
+<p><strong><code>authResponseHeaders</code> must contain all four headers</strong> that Wegaria reads (<code>auth.headers</code> in the configuration). Tested with Traefik v3: Traefik then replaces any value sent by the client. If a header is missing from the list (for example <code>Remote-Groups</code>), Traefik passes a client-supplied value through unchanged and a signed-in user could give themselves arbitrary groups. For that reason <code>compose.yaml</code> additionally removes the four headers before authentication (<code>wegaria-strip-identity</code>). This is a second safeguard against exactly this configuration error. Middleware order: first <code>wegaria-strip-identity</code>, then <code>authelia</code>.</p>
+<h3 id="status-page-without-login-optional">Status page without login (optional)</h3>
+<p>If <code>/status</code> should be reachable without login (for example when the login itself is down), you need a second router without the Authelia middleware that takes precedence. Wegaria shows non-signed-in visitors only content with <code>access: { public: true }</code>. The state of an otherwise invisible internal service can be released with <code>status: { ..., public: true }</code> (Docker: <code>wegaria.status.public</code>), without detail text. See <a href="status.html#public-status-page">Status</a>. With native OIDC, <code>auth.public: true</code> is enough; only the forward-auth setup needs a proxy router.</p>
+<pre><code class="language-yaml">traefik.http.routers.wegaria-status.rule: Host(`${WEGARIA_HOST}`) &amp;&amp; Path(`/status`)
+traefik.http.routers.wegaria-status.priority: &quot;100&quot;
+traefik.http.routers.wegaria-status.entrypoints: websecure
+traefik.http.routers.wegaria-status.tls: &quot;true&quot;
+traefik.http.routers.wegaria-status.middlewares: wegaria-strip-identity   # keep removing the identity headers
+traefik.http.routers.wegaria-status.service: wegaria
+</code></pre>
+<h3 id="feedback-widget-on-the-same-host-optional">Feedback widget on the same host (optional)</h3>
+<p>With <code>feedback: { key: pk_..., identify: true }</code> in <code>wegaria.yaml</code> (see <a href="feedback.html">Feedback</a>), Wegaria inserts a script tag <code>/_feedback/widget.js</code>. It does <strong>not serve the widget itself</strong>: Traefik forwards exactly two paths on the same host to the feedback service. This keeps the CSP (<code>script-src 'self'</code>, <code>connect-src 'self'</code>) unchanged, and the feedback service sees the real client address. The labels sit on the Wegaria container; the service <code>feedback@docker</code> comes from the Compose file of the feedback service (its Traefik Compose file):</p>
+<pre><code class="language-yaml">traefik.http.routers.wegaria-feedback.rule: Host(`${WEGARIA_HOST}`) &amp;&amp; (PathPrefix(`/_feedback/v1`) || Path(`/_feedback/widget.js`))
+traefik.http.routers.wegaria-feedback.priority: &quot;100&quot;
+traefik.http.routers.wegaria-feedback.entrypoints: websecure
+traefik.http.routers.wegaria-feedback.tls: &quot;true&quot;
+traefik.http.routers.wegaria-feedback.middlewares: wegaria-feedback-strip
+traefik.http.routers.wegaria-feedback.service: feedback@docker
+traefik.http.middlewares.wegaria-feedback-strip.stripprefix.prefixes: /_feedback
+</code></pre>
+<ul>
+<li><strong>Only these two paths</strong>, never <code>/_feedback/api</code>, <code>/_feedback/auth</code> or <code>/_feedback/admin</code>. Otherwise the administration and API of the feedback service would be reachable under Wegaria's host.</li>
+<li>Both paths run <strong>without Authelia</strong>, on purpose: the widget also runs on the public status page. The feedback service checks key and allowed origin itself.</li>
+<li>In the feedback service, enter <code>https://${WEGARIA_HOST}</code> as an allowed origin for the project and set <code>TRUST_PROXY=1</code> there.</li>
+<li>Without these labels, <code>/_feedback/widget.js</code> answers 404: the widget does not appear and Wegaria works unchanged.</li>
+<li>To try it locally, see <a href="feedback.html#trying-it-with-the-demo">Feedback</a> (<code>demo/traefik.yml</code>).</li>
+</ul>
+<h3 id="alternative-native-oidc-instead-of-forward-auth">Alternative: native OIDC instead of forward auth</h3>
+<p>Then the headers, <code>trustedProxies</code> and the Authelia middleware are no longer needed, and Wegaria is reachable without forward auth:</p>
+<pre><code class="language-yaml">baseUrl: https://wegaria.example.com
+auth:
+  mode: oidc
+  issuer: https://auth.example.com
+  clientId: wegaria
+  clientSecret: ${env:OIDC_CLIENT_SECRET}
+</code></pre>
+<p>In the Compose file, only remove <code>middlewares</code> (the line with <code>wegaria-strip-identity,authelia@docker</code>). Redirect URI at the IdP: <code>https://wegaria.example.com/auth/callback</code>. Details: <a href="authentication.html#oidc-details">Authentication</a>.</p>
+<h2 id="applications-from-docker-labels-optional">Applications from Docker labels (optional)</h2>
+<p><code>docker:</code> in <code>wegaria.yaml</code> lets Wegaria read tiles from container labels (structure and labels: <a href="applications.html#applications-from-docker-labels">Applications</a>). To use it, enable the commented-out service <code>dockerproxy</code> in <code>deploy/compose.yaml</code> and set <code>endpoint: http://dockerproxy:2375</code>.</p>
+<ul>
+<li>Wegaria <strong>never</strong> gets the Docker socket, only the proxy. The proxy runs in its own internal network and allows only <code>CONTAINERS=1</code>.</li>
+<li>The proxy still sees all containers and their labels (environment variables are not part of the container list; endpoints that would deliver them are blocked by the proxy).</li>
+<li><code>defaultAccess: none</code> is the safe start: new containers appear only once they carry <code>wegaria.groups</code> or <code>wegaria.public</code>.</li>
+<li>The proxy is queried once at start-up; if it is unreachable, Wegaria starts anyway and fetches the list later.</li>
+</ul>
+<h2 id="operations">Operations</h2>
+<ul>
+<li><strong>Backup:</strong> the volume <code>wegaria-data</code> (SQLite in WAL mode; safest with the container stopped or with <code>sqlite3 .backup</code>). It also contains <code>session.key</code>, the key for stored tokens (native OIDC only). Keep database and key separately; then a leaked database backup is not enough to misuse tokens.</li>
+<li><strong>Updating:</strong> <code>docker compose up -d --build</code>. Database migrations run automatically at start-up.</li>
+<li><strong>Logs:</strong> <code>docker compose logs -f wegaria</code>. Failed configuration or content is shown there and, for <code>adminGroups</code>, at the top of the page.</li>
+<li><strong>Multiple instances:</strong> not supported (rate limits are kept in memory; queue and database are local). One instance is enough for an internal portal; users stay signed in across updates because sessions live in <code>/data</code>.</li>
+<li><strong>Notice editor (<code>incidents.editable</code>):</strong> the directory with the notices must be writable for the container; the rest of <code>/config</code> stays read-only:<pre><code class="language-yaml">volumes:
+  - ./config:/config:ro
+  - ./status:/config/status      # writable; owner UID 1000 (user &quot;node&quot;)
+</code></pre>
+</li>
+<li><strong>Time zone:</strong> set <code>timezone: Europe/Berlin</code> in <code>wegaria.yaml</code>; otherwise the container shows times in UTC.</li>
+<li><strong>Git action:</strong> mount the target directory as a volume and list it in <code>targets</code>. The container writes as the user <code>node</code> (UID 1000), so the directory must be writable for that UID. <code>push</code> needs credentials in the container (for example a deploy key); this is deliberately not preconfigured.</li>
+<li><strong>Private CA for internal backends or SMTP:</strong> set <code>NODE_EXTRA_CA_CERTS=/config/ca.pem</code>.</li>
+</ul>
+</article><nav class="pager" aria-label="Pages"><a rel="prev" href="feedback.html">← Feedback widget</a><a rel="next" href="architecture.html">Architecture →</a></nav></main><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#image">Image</a></li><li><a href="#compose-example-traefik-and-authelia-forward-auth">Compose example: Traefik and Authelia (forward auth)</a></li><li><a href="#applications-from-docker-labels-optional">Applications from Docker labels (optional)</a></li><li><a href="#operations">Operations</a></li></ul></nav></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

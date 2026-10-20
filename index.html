@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wegaria: a start page for your team</title><meta name="description" content="A lightweight, self-hosted start page with status, news, FAQ and self-service forms, configured as code.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body class="landing"><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html">Guide</a></nav></div></header><main>
+<section class="hero"><div class="wrap">
+  <h1>A start page that answers two questions</h1>
+  <p class="lead">Where do I want to go? And is anything disrupted on the way? Wegaria is a lightweight, self-hosted start page with application tiles, honest status, news, a FAQ and self-service forms, configured as code.</p>
+  <div class="btns"><a class="btn primary" href="getting-started.html">Get started</a><a class="btn" href="architecture.html">How it is built</a></div>
+  <div class="shot"><img src="assets/screens/home.png" width="1440" height="720" alt="The Wegaria start page: a greeting, a disruption strip, favourite application tiles with their state, and a side column with search, notices and news."></div>
+</div></section>
+
+<section class="section"><div class="wrap">
+  <h2>What it does</h2>
+  <p>One page people open in the morning, and the one they come back to when something does not work.</p>
+  <div class="grid">
+    <div class="card"><h3>Tiles that respect groups</h3><p>Applications, sections and favourites. What a person may not see answers 404 and appears nowhere, not even in search.</p></div>
+    <div class="card"><h3>Honest status</h3><p>Reads Uptime Kuma, Prometheus and Gatus. A notice can explain or worsen a measured state, never hide it.</p></div>
+    <div class="card"><h3>Incidents and maintenance</h3><p>Markdown files, an optional editor in the administration, and a status page that works without signing in.</p></div>
+    <div class="card"><h3>Sign-in your way</h3><p>Forward auth behind Traefik with Authelia, or native OIDC with Keycloak or Authelia, with group re-checks and back-channel logout.</p></div>
+    <div class="card"><h3>Service area</h3><p>FAQ pages and <a href="https://surveyjs.io">SurveyJS</a> forms. Answers are validated again on the server and delivered by e-mail, signed webhook or git from a persistent queue.</p></div>
+    <div class="card"><h3>Discovery from Docker labels</h3><p>Reads Homepage labels and adds permissions, through a read-only socket proxy and never the socket itself.</p></div>
+    <div class="card"><h3>News</h3><p>RSS and Atom feeds, per-feed access, one search rule across tiles, FAQ and news.</p></div>
+    <div class="card"><h3>Configuration as code</h3><p>YAML and Markdown in git, one schema with editor completion, live reload that keeps the last good version when a file breaks.</p></div>
+  </div>
+</div></section>
+
+<section class="section"><div class="wrap">
+  <h2>Looks like part of your place</h2>
+  <p>Brand colour, logo and background through a handful of settings. Light and dark mode, readable on a phone, usable without JavaScript, and checked automatically for accessibility.</p>
+  <div class="shots">
+    <figure><picture><source media="(prefers-color-scheme: dark)" srcset="assets/screens/form-dark.png"><img src="assets/screens/form-light.png" width="1440" height="1000" loading="lazy" alt="A self-service form in the service area, with notes in a side column."></picture><figcaption>A form with its side column, in light or dark mode following your system.</figcaption></figure>
+    <figure><img src="assets/screens/status.png" width="1440" height="900" loading="lazy" alt="The status page: overall state, a list of services with their state, and current notices."><figcaption>The status page: overall state in words, services, and current notices.</figcaption></figure>
+  </div>
+</div></section>
+
+<section class="section"><div class="wrap">
+  <h2>Run it in a minute</h2>
+  <div class="two">
+    <div><p>Try it with the demo, which brings mock backends and example content:</p>
+<pre><code>git clone &lt;repository&gt; wegaria &amp;&amp; cd wegaria
+npm install
+npm run demo   # http://localhost:3100</code></pre></div>
+    <div><p>Then a minimal <code>wegaria.yaml</code>:</p>
+<pre><code>title: Intranet
+auth: { mode: dev, groups: [staff] }
+sections:
+  - title: Daily work
+    items:
+      - { title: Mail, url: https://mail.example.com, icon: "lucide:mail" }</code></pre></div>
+  </div>
+  <div class="note"><strong>Status: pre-1.0.</strong> Everything described here is implemented and covered by automated tests, but Wegaria has not yet been tried against real Authelia, Keycloak, SMTP, Uptime Kuma and Traefik installations. The interface is German only for now. See <a href="getting-started.html">Getting started</a> and the <a href="deployment.html">deployment guide</a>.</div>
+</div></section>
+</main>
+<footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

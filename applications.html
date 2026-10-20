@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Applications · Wegaria</title><meta name="description" content="Application tiles, application pages with documentation, search, and discovery from Docker labels.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html">Getting started</a></li><li><a href="appearance.html">Appearance</a></li><li><a href="applications.html" aria-current="page">Applications</a></li><li><a href="status.html">Status and notices</a></li><li><a href="news.html">News</a></li><li><a href="service.html">Service area</a></li><li><a href="authentication.html">Authentication and access</a></li><li><a href="feedback.html">Feedback widget</a></li><li><a href="deployment.html">Deployment</a></li><li><a href="architecture.html">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="applications">Applications</h1>
+<p>Applications are shown as tiles on the start page, grouped into sections. Tiles are defined in <code>wegaria.yaml</code> and, optionally, discovered from Docker container labels.</p>
+<h2 id="tiles-and-sections">Tiles and sections</h2>
+<pre><code class="language-yaml">sections:
+  - title: Daily work
+    access: { groups: [staff] }          # optional, applies to all tiles of the section
+    items:
+      - title: Mail
+        id: mail                         # optional; default: slug of the title
+        url: https://mail.example.com
+        description: Webmail
+        icon: &quot;lucide:mail&quot;
+        newTab: true                     # default true
+        docs:
+          - { title: Manual, url: https://wiki.example.com/mail }
+        searchOnly: false
+        access: { groups: [staff], deny: [guests] }
+        status: { provider: kuma, monitor: Mail }
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Tile field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>title</code></td>
+<td>Name of the tile (required).</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>Lower-case letters, digits and dashes. Referenced by <code>affects</code> in incidents and by <code>apps</code> in service pages and <code>home.defaults</code>. Default: a slug of the title. Duplicate ids are rejected.</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>An http(s), <code>mailto:</code> or <code>tel:</code> URL or an absolute path (no <code>javascript:</code>).</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>Optional text; also searched.</td>
+</tr>
+<tr>
+<td><code>icon</code></td>
+<td>See <a href="appearance.html#icons">icons</a>.</td>
+</tr>
+<tr>
+<td><code>newTab</code></td>
+<td>Open in a new tab (default <code>true</code>).</td>
+</tr>
+<tr>
+<td><code>docs</code></td>
+<td>List of <code>{ title, url }</code> links to documentation outside Wegaria (http(s) only). See <a href="#application-pages-and-documentation">application pages</a>.</td>
+</tr>
+<tr>
+<td><code>searchOnly</code></td>
+<td>Not shown on the start page, not hideable, but found by the search. For rarely needed applications.</td>
+</tr>
+<tr>
+<td><code>access</code></td>
+<td><code>{ groups, deny, public }</code>, see <a href="authentication.html#access-rules">Access rules</a>.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>Status dot from a provider, see <a href="status.html">Status</a>.</td>
+</tr>
+</tbody>
+</table>
+<p>Tile ids used in <code>home.defaults</code> must exist; unknown ids are rejected by the configuration check.</p>
+<h2 id="application-pages-and-documentation">Application pages and documentation</h2>
+<p>If an application has something stored for it, its tile shows a book symbol (otherwise not) and leads to <code>/app/&lt;tile-id&gt;</code>.</p>
+<p>At the top are the name, the state and, like the strip on the start page, the current notices and maintenance of this application (without the navigation row and search of the other pages). Below, on the left, the <strong>documentation</strong> is listed by headings (together with further links and related <strong>requests</strong>); on the right the selected page appears in full (<code>?doc=&lt;page-id&gt;</code>; without a selection, the first one).</p>
+<p>Documentation can be attached in two ways:</p>
+<ul>
+<li><strong>External:</strong> <code>docs: [{ title: Manual, url: https://wiki.example.com/mail }]</code> on the tile (Docker: label <code>wegaria.docs.&lt;title&gt;: &lt;url&gt;</code>).</li>
+<li><strong>Inside Wegaria:</strong> FAQ pages and forms of the <a href="service.html">service area</a> name the tile in their header with <code>apps: [mail]</code> (Markdown front matter or form YAML). This also allows several runbooks per application, maintained as Markdown.</li>
+</ul>
+<p>Details for pages kept inside Wegaria:</p>
+<ul>
+<li>Every page has its own permissions: those of its category (for example a category &quot;Operations&quot; for <code>it</code> only) and, optionally, <code>access:</code> in the header of the file. Someone who may not see a page gets it neither in the list nor through <code>?doc=</code> (and the tile may show no book symbol for that person).</li>
+<li>The heading in the list is by default the title of the category. Override it with <code>group: Operations</code> in the header of the file. <code>order</code> determines the sequence.</li>
+<li>Do not put credentials into these pages: they are visible to everyone who may see the page.</li>
+<li>Unknown tile ids in <code>apps</code> are reported to <code>adminGroups</code> as a hint.</li>
+</ul>
+<h2 id="search">Search</h2>
+<p>One search covers everything the user may see:</p>
+<ul>
+<li>applications (title, description, section),</li>
+<li>the service area (FAQ, forms),</li>
+<li>news (what the feeds deliver, not an archive).</li>
+</ul>
+<p>On the start page the field shows a menu above the page while typing (<code>/search/live</code>, from 2 characters; arrow keys; Esc or a click outside closes it). Applications appear in it like the tiles, with icon and status. Without JavaScript, and on all other pages, the field leads to the results page <code>/search</code>. Permissions are applied before a hit is returned.</p>
+<p>On the news page the search field filters the news instead; see <a href="news.html">News</a>.</p>
+<h2 id="applications-from-docker-labels">Applications from Docker labels</h2>
+<p>Instead of maintaining every tile in <code>wegaria.yaml</code>, Wegaria can read applications from the labels of running containers. A <strong>read-only Docker socket proxy</strong> is enough (for example <code>tecnativa/docker-socket-proxy</code> with <code>CONTAINERS=1</code>, everything else off). Wegaria never gets the Docker socket itself.</p>
+<pre><code class="language-yaml">docker:
+  endpoint: http://dockerproxy:2375
+  defaultAccess: none          # all | none: containers without a permission label are seen by all signed-in users / by nobody
+  defaultGroup: Other applications   # section used when no group label is set
+  intervalSeconds: 30
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>endpoint</code></td>
+<td>required</td>
+<td>http(s) URL of the Docker socket proxy. Needs <code>CONTAINERS=1</code> only.</td>
+</tr>
+<tr>
+<td><code>auth</code></td>
+<td>none</td>
+<td>Optional credentials for the proxy (same format as for providers).</td>
+</tr>
+<tr>
+<td><code>defaultAccess</code></td>
+<td>required</td>
+<td><code>all</code> or <code>none</code> for containers without <code>wegaria.groups</code>, <code>wegaria.deny</code> or <code>wegaria.public</code>.</td>
+</tr>
+<tr>
+<td><code>defaultGroup</code></td>
+<td><code>Weitere Anwendungen</code></td>
+<td>Section for containers without a group label.</td>
+</tr>
+<tr>
+<td><code>intervalSeconds</code></td>
+<td><code>30</code></td>
+<td>Polling interval (minimum 5).</td>
+</tr>
+</tbody>
+</table>
+<p>The labels of <a href="https://gethomepage.dev" rel="noopener">Homepage</a> are read (<code>homepage.group</code>, <code>.name</code>, <code>.href</code>, <code>.description</code>, <code>.icon</code>, <code>.weight</code>), so existing containers appear without changes. Wegaria's own <code>wegaria.*</code> labels take precedence and add what Homepage does not know, above all the <strong>permissions</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wegaria.enable</code></td>
+<td><code>true</code>/<code>false</code>. Without the label, every container with <code>wegaria.title</code> or <code>homepage.name</code> counts.</td>
+</tr>
+<tr>
+<td><code>wegaria.title</code>, <code>wegaria.url</code>, <code>wegaria.description</code>, <code>wegaria.icon</code>, <code>wegaria.group</code>, <code>wegaria.weight</code>, <code>wegaria.id</code>, <code>wegaria.newTab</code>, <code>wegaria.searchOnly</code></td>
+<td>Like the fields of a tile.</td>
+</tr>
+<tr>
+<td><code>wegaria.docs.&lt;title&gt;</code></td>
+<td>Documentation link (value: URL), like <code>docs</code> on a tile.</td>
+</tr>
+<tr>
+<td><code>wegaria.groups</code>, <code>wegaria.deny</code></td>
+<td>Comma-separated groups that may or may not see the application.</td>
+</tr>
+<tr>
+<td><code>wegaria.public</code></td>
+<td><code>true</code> = visible even without signing in (status page).</td>
+</tr>
+<tr>
+<td><code>wegaria.status.provider</code> + <code>.monitor</code> / <code>.endpoint</code> / <code>.query</code></td>
+<td>Status dot, like <code>status:</code> on a tile.</td>
+</tr>
+<tr>
+<td><code>wegaria.status.public</code></td>
+<td><code>true</code> = only the state is shown on <code>/status</code> to everyone, even if the tile itself is not visible.</td>
+</tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li>Homepage icons such as <code>sh-nextcloud</code> (dashboard-icons CDN) are not loaded; the initials appear until <code>wegaria.icon</code> is set. With <code>icons.dir</code>, <code>homepage.icon: grafana</code> is mapped to the local logo; see <a href="appearance.html#logos-from-dashboard-icons">Icons</a>.</li>
+<li>Configured tiles always take precedence. If a section has the same title in both places, the two are merged.</li>
+<li>Faulty containers are skipped with a warning in the log.</li>
+<li>If the proxy fails, the last list stays in place.</li>
+<li>Changes to <code>docker:</code> need a restart.</li>
+<li>Wegaria queries the proxy once at start-up; if it is unreachable, Wegaria starts anyway and fetches the list later.</li>
+<li><code>defaultAccess: none</code> is the safe start: new containers appear only once they carry <code>wegaria.groups</code> or <code>wegaria.public</code>.</li>
+</ul>
+<p>For the proxy setup in Compose (own internal network, what the proxy can still see), see <a href="deployment.html#applications-from-docker-labels-optional">Deployment</a>.</p>
+</article><nav class="pager" aria-label="Pages"><a rel="prev" href="appearance.html">← Appearance</a><a rel="next" href="status.html">Status and notices →</a></nav></main><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#tiles-and-sections">Tiles and sections</a></li><li><a href="#application-pages-and-documentation">Application pages and documentation</a></li><li><a href="#search">Search</a></li><li><a href="#applications-from-docker-labels">Applications from Docker labels</a></li></ul></nav></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

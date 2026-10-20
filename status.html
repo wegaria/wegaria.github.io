@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status and notices · Wegaria</title><meta name="description" content="Status providers, widgets, incidents and maintenance, the notice editor and the public status page.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html">Getting started</a></li><li><a href="appearance.html">Appearance</a></li><li><a href="applications.html">Applications</a></li><li><a href="status.html" aria-current="page">Status and notices</a></li><li><a href="news.html">News</a></li><li><a href="service.html">Service area</a></li><li><a href="authentication.html">Authentication and access</a></li><li><a href="feedback.html">Feedback widget</a></li><li><a href="deployment.html">Deployment</a></li><li><a href="architecture.html">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="status-and-notices">Status and notices</h1>
+<p>Wegaria has no checker of its own. It reads existing systems through <code>providers</code>, shows their state as a dot on tiles, and adds incident and maintenance notices.</p>
+<h2 id="providers">Providers</h2>
+<pre><code class="language-yaml">providers:
+  kuma:
+    type: uptime-kuma
+    baseUrl: https://status.example.com
+    statusPage: main
+    auth: { bearer: &quot;${file:/run/secrets/kuma}&quot; }
+    cacheSeconds: 30
+    timeoutMs: 5000
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Tile reference</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>uptime-kuma</code></td>
+<td><code>monitor:</code> name or id</td>
+<td>Public status page API (<code>/api/status-page/&lt;slug&gt;</code>); the monitor must be on that page. The slug is set with <code>statusPage</code>.</td>
+</tr>
+<tr>
+<td><code>prometheus</code></td>
+<td><code>query:</code> PromQL</td>
+<td><code>/api/v1/query</code>. Result greater than 0 = healthy, mixed = degraded.</td>
+</tr>
+<tr>
+<td><code>gatus</code></td>
+<td><code>endpoint:</code> key, <code>group/name</code> or name</td>
+<td><code>/api/v1/endpoints/statuses</code> (the first 100 endpoints).</td>
+</tr>
+<tr>
+<td><code>http</code></td>
+<td>none</td>
+<td>Source for widgets: JSON from <code>baseUrl + path</code>, fields through a JSONPath subset (<code>$.a.b[0]['c']</code>).</td>
+</tr>
+</tbody>
+</table>
+<p>Common provider fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>baseUrl</code></td>
+<td>required</td>
+<td>Base URL of the backend.</td>
+</tr>
+<tr>
+<td><code>auth</code></td>
+<td>none</td>
+<td>One of <code>{ bearer: ... }</code>, <code>{ basic: { user, password } }</code>, <code>{ headers: { Name: value } }</code>. Use <code>${env:X}</code> or <code>${file:...}</code>.</td>
+</tr>
+<tr>
+<td><code>timeoutMs</code></td>
+<td><code>5000</code></td>
+<td>Request timeout (max. 30000).</td>
+</tr>
+<tr>
+<td><code>cacheSeconds</code></td>
+<td><code>30</code></td>
+<td>Cache lifetime; data is refreshed in the background.</td>
+</tr>
+</tbody>
+</table>
+<p>A tile refers to a provider with a <code>status</code> block:</p>
+<pre><code class="language-yaml">- title: Mail
+  url: https://mail.example.com
+  status: { provider: kuma, monitor: Mail }       # uptime-kuma
+# status: { provider: prom, query: 'up{job=&quot;mail&quot;}' }   # prometheus: PromQL that yields &gt; 0 when healthy
+# status: { provider: gatus, endpoint: core_mail }       # gatus
+</code></pre>
+<p>Each provider type needs its own reference field (<code>monitor</code>, <code>query</code> or <code>endpoint</code>), and fields of other types are rejected. Providers of type <code>http</code> are for widgets only, not for status.</p>
+<p>Behaviour and safety:</p>
+<ul>
+<li>All queries run in the backend. Credentials (<code>auth.bearer</code>, <code>basic</code>, <code>headers</code>) are never delivered to the browser.</li>
+<li>Data comes from a cache (<code>cacheSeconds</code>, default 30 s) and is refreshed in the background; only the first request waits for the backend. If a backend fails, the last value is marked &quot;stale&quot; (&quot;veraltet&quot;), otherwise &quot;unknown&quot; (&quot;unbekannt&quot;). Timeout 5 s, responses at most 1 MB, no redirects.</li>
+<li>Only what the user may see is queried (<code>access</code> also applies to widgets).</li>
+<li>Values from backends are rendered as text, never as HTML.</li>
+<li>For internal backends with a private CA, set <code>NODE_EXTRA_CA_CERTS=/path/ca.pem</code>.</li>
+</ul>
+<h2 id="widgets">Widgets</h2>
+<p>Widgets show key figures from an <code>http</code> provider. They appear in the side column of the start page when <code>widgets</code> is listed in <code>home.side</code> (see <a href="appearance.html#side-column-homeside">Appearance</a>).</p>
+<pre><code class="language-yaml">providers:
+  api:
+    type: http
+    baseUrl: https://metrics.example.com
+widgets:
+  - title: Tickets
+    provider: api
+    path: /summary
+    link: https://helpdesk.example.com
+    access: { groups: [it] }
+    fields:
+      - { label: Open, path: &quot;$.tickets.open&quot;, format: number }
+      - { label: SLA, path: &quot;$.sla.rate&quot;, format: percent }
+      - { label: State, path: &quot;$.state&quot;, format: text }
+</code></pre>
+<p><code>path</code> must start with a single <code>/</code>. <code>format</code> is <code>text</code> (default), <code>number</code> or <code>percent</code>; <code>suffix</code> is optional text after the value. The JSONPath subset supports <code>$.a.b[0]['c']</code>; other expressions are rejected by the configuration check.</p>
+<h2 id="incidents-and-maintenance">Incidents and maintenance</h2>
+<p><code>incidents: { dir: status, from: [kuma] }</code> switches notices on.</p>
+<pre><code class="language-yaml">incidents:
+  dir: status            # folder with *.incident.md and *.maintenance.md, relative to the config file
+  from: [kuma]           # uptime-kuma providers whose status-page incident and maintenance are shown too
+  showResolvedDays: 7    # how long resolved incidents stay listed
+  announceDays: 14       # how far ahead planned maintenance is announced
+  editable: false        # let adminGroups edit notices in /admin/notices
+</code></pre>
+<p>Sources:</p>
+<ul>
+<li><strong>Files</strong> <code>status/&lt;name&gt;.incident.md</code> and <code>&lt;name&gt;.maintenance.md</code> (front matter plus Markdown; templates: <code>config/status/*.example</code>). Incidents have <code>severity</code> (<code>info|minor|major|critical</code>), <code>status</code> (<code>investigating|identified|monitoring|resolved</code>) and an update timeline. Maintenance has <code>start</code> and <code>end</code>. Tiles are linked through <code>affects: [tile-id]</code> (the <code>id:</code> of the tile, otherwise the slug of its title, for example &quot;Mail&quot; becomes <code>mail</code>).</li>
+<li><strong>Uptime Kuma</strong> (<code>from:</code>): the incident (pin) and running maintenance of the status page also appear. Kuma does not name the affected monitors, so they apply generally (not per tile). Only providers of type <code>uptime-kuma</code> may be listed in <code>from</code>.</li>
+</ul>
+<p>Date and time inputs are interpreted in the zone <code>timezone</code> (IANA name, for example <code>Europe/Berlin</code>); without it Wegaria uses the server's zone, which in a container is usually UTC. The same zone applies to all displayed times.</p>
+<p>Effects:</p>
+<ul>
+<li>A banner on the start page (active incidents, running maintenance and maintenance planned within <code>announceDays</code>); see <a href="appearance.html#notices-in-levels">Appearance</a>.</li>
+<li>The <code>/status</code> page with a timeline and &quot;Kürzlich behoben&quot; (recently resolved; <code>showResolvedDays</code>).</li>
+<li>The status of affected tiles: running maintenance is blue, <code>minor</code> is yellow, <code>major</code> and <code>critical</code> are red.</li>
+</ul>
+<p>A notice can only worsen or explain a measured status, never make it look better. If the measured status is worse, it stays, with the notice as the explanation.</p>
+<p><code>access</code> per notice works as everywhere (default: signed-in users; <code>public: true</code> also for anonymous visitors). Typos in <code>affects</code> are reported to <code>adminGroups</code> as hints.</p>
+<h3 id="notice-editor">Notice editor</h3>
+<p>With <code>incidents: { editable: true }</code>, an editor for incidents and maintenance appears at <code>/admin/notices</code>: create, edit, add to the timeline, set to resolved (&quot;Behoben&quot;), delete. It writes the same Markdown files into <code>incidents.dir</code>, so they can still be maintained by hand or through git.</p>
+<ul>
+<li>The directory must be writable. In a container, mount it separately (for example <code>./status:/config/status</code>), see <a href="deployment.html#operations">Deployment</a>.</li>
+<li>When saving, the file is rewritten; hand-written comments in it are lost.</li>
+<li>All changes are in the audit log (<code>notice.created|updated|deleted</code>).</li>
+</ul>
+<h2 id="public-status-page">Public status page</h2>
+<p><code>/status</code> is also reachable for visitors who are not signed in (with native OIDC without a redirect to the login). Only what is released with <code>access: { public: true }</code> is visible. If nothing is public, the page says so instead of claiming that everything is fine.</p>
+<p><strong>Only the state of an internal service public:</strong> <code>status: { provider: ..., public: true }</code> on a tile shows name and state on <code>/status</code> (and in the overall state of the quick menu) even to visitors who may not see the tile. The tile itself stays invisible (start page, search, application page). Provider detail texts (error messages, host names) are given only to authorised users. In Docker labels this is <code>wegaria.status.public</code>.</p>
+<p><strong>Whole pages without login:</strong> <code>auth.public: true</code> (<code>oidc</code> only; with <code>headers</code>, the proxy decides whether anonymous requests get through).</p>
+<p>Behind Traefik forward auth, <code>/status</code> must be routed past the Authelia middleware for this; see <a href="deployment.html#status-page-without-login-optional">Deployment</a>.</p>
+</article><nav class="pager" aria-label="Pages"><a rel="prev" href="applications.html">← Applications</a><a rel="next" href="news.html">News →</a></nav></main><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#providers">Providers</a></li><li><a href="#widgets">Widgets</a></li><li><a href="#incidents-and-maintenance">Incidents and maintenance</a></li><li><a href="#public-status-page">Public status page</a></li></ul></nav></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

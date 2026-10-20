@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>News · Wegaria</title><meta name="description" content="Show entries from RSS and Atom feeds on the start page and on a news page.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html">Getting started</a></li><li><a href="appearance.html">Appearance</a></li><li><a href="applications.html">Applications</a></li><li><a href="status.html">Status and notices</a></li><li><a href="news.html" aria-current="page">News</a></li><li><a href="service.html">Service area</a></li><li><a href="authentication.html">Authentication and access</a></li><li><a href="feedback.html">Feedback widget</a></li><li><a href="deployment.html">Deployment</a></li><li><a href="architecture.html">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="news">News</h1>
+<p><code>news</code> shows entries from RSS or Atom feeds: a box in the side column of the start page (the newest <code>limit</code>, default 5) and the page <code>/news</code> (up to <code>pageLimit</code>, default 50), reachable in the menu as &quot;News&quot;.</p>
+<pre><code class="language-yaml">news:
+  limit: 5          # entries in the side column of the start page (1 to 50)
+  pageLimit: 50     # entries on /news (1 to 200)
+  feeds:
+    - { name: Intranet, url: https://intranet.example.com/feed.xml, cacheSeconds: 600 }
+    - { name: Personnel, url: https://hr.example.com/feed.xml, auth: { bearer: &quot;${file:/run/secrets/hr_feed}&quot; }, access: { groups: [staff] } }
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Feed field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>required</td>
+<td>Shown as the source of each entry. Must be unique.</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>required</td>
+<td>http(s) URL of the feed.</td>
+</tr>
+<tr>
+<td><code>auth</code></td>
+<td>none</td>
+<td><code>{ bearer }</code>, <code>{ basic: { user, password } }</code> or <code>{ headers }</code>; sent only from the server.</td>
+</tr>
+<tr>
+<td><code>access</code></td>
+<td>none</td>
+<td>Who may see the entries of this feed.</td>
+</tr>
+<tr>
+<td><code>timeoutMs</code></td>
+<td><code>5000</code></td>
+<td>Request timeout (max. 30000).</td>
+</tr>
+<tr>
+<td><code>cacheSeconds</code></td>
+<td><code>600</code></td>
+<td>Cache lifetime; refreshed in the background.</td>
+</tr>
+</tbody>
+</table>
+<p>To show the news box in the side column, keep <code>news</code> in <code>home.side</code> (it is part of the default). See <a href="appearance.html#side-column-homeside">Appearance</a>.</p>
+<h2 id="behaviour">Behaviour</h2>
+<ul>
+<li>Wegaria only reads the feed URL. How the feed is produced (for example from SharePoint) is not its concern. Supported: RSS 2.0, RSS 1.0, Atom.</li>
+<li><code>access</code> applies per feed as with tiles. Feeds the user may not see are not fetched for that user. If the user sees no feed, <code>/news</code> and the menu entry do not exist for them.</li>
+<li>Several feeds are merged by date. If more than one feed is visible, <code>name</code> is shown as the source on each entry.</li>
+<li>On <code>/news</code>, a search field replaces the navigation row and filters the news: immediately while typing (script), and without JavaScript or for links through <code>/news?q=...</code>. The same rule as in the global search applies: every word must be the start of a word in the title, source or excerpt, ignoring case and umlauts. What is filtered is what the feed delivers (at most <code>pageLimit</code> entries).</li>
+<li>Title, date, link and an excerpt shortened to plain text are shown. HTML from the feed is never output; links only with <code>http(s)</code>.</li>
+<li>Like providers, responses come from a cache and are renewed in the background. A dead feed shows the last entries, or &quot;Nicht verfügbar&quot; (not available), and slows nothing down.</li>
+<li>Redirects are not followed (credentials stay with the server), so enter the final URL.</li>
+<li>The size of a feed is limited to 1 MB.</li>
+</ul>
+</article><nav class="pager" aria-label="Pages"><a rel="prev" href="status.html">← Status and notices</a><a rel="next" href="service.html">Service area →</a></nav></main></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>

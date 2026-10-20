@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started · Wegaria</title><meta name="description" content="Install Wegaria, try the demo, run it for development and write your first configuration.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/style.css"></head>
+<body><header class="top"><div class="wrap">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Wegaria</span></a>
+<nav aria-label="Main"><a href="getting-started.html" aria-current="page">Guide</a></nav></div></header><div class="wrap doc"><aside class="side"><nav aria-label="Guide"><ul><li><a href="getting-started.html" aria-current="page">Getting started</a></li><li><a href="appearance.html">Appearance</a></li><li><a href="applications.html">Applications</a></li><li><a href="status.html">Status and notices</a></li><li><a href="news.html">News</a></li><li><a href="service.html">Service area</a></li><li><a href="authentication.html">Authentication and access</a></li><li><a href="feedback.html">Feedback widget</a></li><li><a href="deployment.html">Deployment</a></li><li><a href="architecture.html">Architecture</a></li></ul></nav></aside>
+<main><article><h1 id="getting-started">Getting started</h1>
+<p>Wegaria is a single Node.js process with an SQLite database. It is configured with one YAML file (<code>wegaria.yaml</code>) plus optional Markdown and YAML content files.</p>
+<h2 id="try-the-demo">Try the demo</h2>
+<pre><code class="language-sh">npm install
+npm run demo         # http://localhost:3100
+</code></pre>
+<p>The demo contains example content and mock backends (status, Docker labels, news feed, webhook). It restarts when the code changes (<code>tsx watch</code>).</p>
+<ul>
+<li>The demo starts Wegaria in <code>dev</code> authentication mode with a fixed user (groups <code>it</code> and <code>staff</code>; see <code>demo/wegaria.yaml</code>).</li>
+<li>Example submissions are stored in <code>demo/.state/</code>. Delete that directory to reset the demo. The git archive and the database used by the demo also live there.</li>
+<li><code>http://127.0.0.1:3101/toggle-gitlab</code> switches the status of the &quot;Gitlab&quot; application in the mock backends.</li>
+<li>Webhooks that are delivered appear in the console.</li>
+<li>To use your own demo environment (your own <code>wegaria.yaml</code>, <code>content/</code> and <code>assets/</code>), keep it in any other directory, for example in a private repository that contains this project as a submodule, and run <code>DEMO_DIR=/path/to/demo npm run demo</code>. State is then stored in <code>&lt;DEMO_DIR&gt;/.state/</code>.</li>
+<li>To try the feedback widget with the demo, see <a href="feedback.html#trying-it-with-the-demo">Feedback</a>.</li>
+</ul>
+<h2 id="development">Development</h2>
+<pre><code class="language-sh">npm install
+npm run dev          # http://localhost:3000, uses config/wegaria.yaml
+npm test
+npm run gen:schema   # writes config/wegaria.schema.json for IDE completion
+npm run build &amp;&amp; npm start
+</code></pre>
+<p><code>npm run gen:schema</code> generates the JSON schema from the configuration schema in <code>src/config/schema.ts</code>. Point your editor's YAML support at <code>config/wegaria.schema.json</code> to get completion and validation while editing <code>wegaria.yaml</code>.</p>
+<h2 id="environment-variables">Environment variables</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WEGARIA_CONFIG</code></td>
+<td><code>config/wegaria.yaml</code> (in the container: <code>/config/wegaria.yaml</code>)</td>
+<td>Path to the YAML configuration file. Content, assets and status directories are resolved relative to it.</td>
+</tr>
+<tr>
+<td><code>WEGARIA_DATA</code></td>
+<td><code>./data</code> (in the container: <code>/data</code>)</td>
+<td>Directory for the SQLite database <code>wegaria.sqlite3</code> (submissions, action queue, audit log, sessions, favourites) and, with native OIDC, <code>session.key</code>.</td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>3000</code></td>
+<td>TCP port the server listens on.</td>
+</tr>
+<tr>
+<td><code>NODE_EXTRA_CA_CERTS</code></td>
+<td>–</td>
+<td>Path to an extra CA certificate (PEM) for internal backends and SMTP servers that use a private CA.</td>
+</tr>
+</tbody>
+</table>
+<p>Secrets inside <code>wegaria.yaml</code> are never written in plain text. Use <code>${env:NAME}</code> or <code>${file:/run/secrets/name}</code>; see <a href="authentication.html#secrets">Authentication</a>.</p>
+<h2 id="a-first-configuration">A first configuration</h2>
+<pre><code class="language-yaml">title: Intranet
+auth:
+  mode: dev                 # fixed user from this file, for development only
+  groups: [staff]
+sections:
+  - title: Daily work
+    items:
+      - { title: Mail, url: https://mail.example.com, icon: &quot;lucide:mail&quot; }
+      - { title: Wiki, url: https://wiki.example.com, icon: &quot;lucide:book-open&quot; }
+  - title: Administration
+    access: { groups: [it] }   # only members of the group &quot;it&quot; see this section
+    items:
+      - { title: Monitoring, url: https://monitoring.example.com }
+</code></pre>
+<p>Everything else (status, news, service area, footer, ...) is optional and switched on by adding the corresponding block. The pages of this guide describe each block.</p>
+<p>Tile ids are used to refer to a tile from other places (favourite defaults, <code>affects</code> in incidents, <code>apps</code> in service pages). A tile gets the id given in <code>id:</code> or otherwise a slug of its title (&quot;Mail&quot; becomes <code>mail</code>). Ids must be unique.</p>
+<h2 id="reloading-the-configuration">Reloading the configuration</h2>
+<p>Changes below the config directory (the YAML file, <code>content/</code>, <code>assets/</code>, <code>status/</code>) are picked up automatically, without a restart.</p>
+<ul>
+<li>If the new file is invalid, the previous version stays active. The error is written to the log and shown at the top of the page to members of <code>adminGroups</code>.</li>
+<li><code>auth</code> and <code>baseUrl</code> are read only at start-up. Changes to them are rejected until Wegaria is restarted.</li>
+<li>Changes to <code>docker:</code> need a restart.</li>
+<li>Secrets from <code>${file:...}</code> and <code>${env:...}</code> are re-read only when the YAML file changes.</li>
+</ul>
+<h2 id="other-top-level-settings">Other top-level settings</h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>title</code></td>
+<td><code>Wegaria</code></td>
+<td>Page title.</td>
+</tr>
+<tr>
+<td><code>subtitle</code></td>
+<td>none</td>
+<td>Line under the greeting on the start page; leave it out for no line.</td>
+</tr>
+<tr>
+<td><code>lang</code></td>
+<td><code>de</code></td>
+<td>Language code. The setting exists, but the interface is currently German only and not translated yet. It currently also selects the CSV delimiter (see <a href="service.html#csv-export">Service area</a>).</td>
+</tr>
+<tr>
+<td><code>baseUrl</code></td>
+<td>none</td>
+<td>Public URL of Wegaria. Required for <code>oidc</code> and used for CSRF (Origin) checks behind a proxy.</td>
+</tr>
+<tr>
+<td><code>timezone</code></td>
+<td>server zone</td>
+<td>IANA zone name such as <code>Europe/Berlin</code> for displayed times, greetings and dates typed in the admin forms. In containers the server zone is usually UTC.</td>
+</tr>
+<tr>
+<td><code>adminGroups</code></td>
+<td><code>[]</code></td>
+<td>Groups that see operational notices (configuration reload errors, hints about unknown ids) and can use <code>/admin</code>.</td>
+</tr>
+<tr>
+<td><code>refreshSeconds</code></td>
+<td><code>0</code></td>
+<td>Reload the page periodically (0 = off).</td>
+</tr>
+<tr>
+<td><code>auditRetentionDays</code></td>
+<td><code>365</code></td>
+<td>Submission records and audit entries older than this are deleted.</td>
+</tr>
+</tbody>
+</table>
+<p>The remaining blocks are described on their own pages: <code>branding</code>, <code>home</code> and <code>footer</code> in <a href="appearance.html">Appearance</a>; <code>sections</code>, <code>docker</code> and <code>icons</code> in <a href="applications.html">Applications</a>; <code>providers</code>, <code>widgets</code> and <code>incidents</code> in <a href="status.html">Status</a>; <code>news</code> in <a href="news.html">News</a>; <code>service</code>, <code>smtp</code> and <code>targets</code> in <a href="service.html">Service area</a>; <code>auth</code> in <a href="authentication.html">Authentication</a>; <code>feedback</code> in <a href="feedback.html">Feedback</a>.</p>
+<h2 id="next-steps">Next steps</h2>
+<ul>
+<li>Run it for real: <a href="deployment.html">Deployment</a>.</li>
+<li>Decide how people sign in: <a href="authentication.html">Authentication</a>.</li>
+<li>Add your applications: <a href="applications.html">Applications</a>.</li>
+</ul>
+</article><nav class="pager" aria-label="Pages"><span></span><a rel="next" href="appearance.html">Appearance →</a></nav></main><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#try-the-demo">Try the demo</a></li><li><a href="#development">Development</a></li><li><a href="#environment-variables">Environment variables</a></li><li><a href="#a-first-configuration">A first configuration</a></li><li><a href="#reloading-the-configuration">Reloading the configuration</a></li><li><a href="#other-top-level-settings">Other top-level settings</a></li><li><a href="#next-steps">Next steps</a></li></ul></nav></div><footer class="foot"><div class="wrap"><span>Wegaria is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 licence</a>.</span></div></footer></body></html>
